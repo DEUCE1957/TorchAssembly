@@ -1,0 +1,1 @@
+{"id": "test", "__modules__": [], "__types__": [["no_epochs", "int"], ["batch_size", "int"], ["shuffle", "bool"], ["dropout_probability", "float"], ["learning_rate", "float"]], "__values__": [], "__nested__": [["optimizer", ["type", "type", "type", "type", "type", "type", "type", "type", "type", "type", "type"]]]}
