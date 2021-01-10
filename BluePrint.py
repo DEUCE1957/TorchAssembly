@@ -15,10 +15,14 @@
 import sys, pickle, re, copy, inspect, json
 from types import * 
 import torch
-import re
+import logging
 from pathlib import Path
 from Color import Color as C
 
+class BluePrint_Settings(object):
+
+    def __init__(id, filePath=None, ):
+        pass
 
 class BluePrint(object):
 
@@ -40,9 +44,8 @@ class BluePrint(object):
         vars(self).update(kwargs)
 
     def get_module_classes(self, module):
-        # exec(f"import {moduleName}")
         cls_dict = {}
-        for count, (name, cls) in enumerate(inspect.getmembers(module, inspect.isclass)):# enumerate(dir(eval(moduleName))):
+        for count, (name, cls) in enumerate(inspect.getmembers(module, inspect.isclass)):
             if re.search("__", name) or re.search("^_|_$", name):
                 continue
             desc = cls.__doc__
@@ -50,7 +53,7 @@ class BluePrint(object):
             print(f"{count}: {C.BOLD}{name}{C.END} ({desc})")
             cls_dict[count] = cls
 
-        resp = input("Provide digit (e.g. 3), or list of digits (e.g. 2,4,6 ), of elements to IGNORE")
+        resp = input("Provide digit (e.g. 3), or list of digits (e.g. 2,4,6 ), of elements to IGNORE. 'x' to exit")
         while resp != "x":
             numbers = resp.split(",")
             for number in numbers:
@@ -67,7 +70,8 @@ class BluePrint(object):
                 desc = "No Description Found" if desc is None else  desc.split("\n")[0]
                 print(f"{count}: {C.BOLD}{cls.__name__}{C.END} ({desc})")
             resp = input("Provide digit or list of digits to ignore, 'x' to exit")
-        return [cls for cls in cls_dict.values()]
+        return [class_from_string(f"{module.__name__}.{cls.__name__}") for cls in cls_dict.values()]
+
 
     def __eq__(self, other):
         x, y = vars(self), vars(other)
@@ -88,7 +92,7 @@ class BluePrintEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, BluePrint):
             template = {"id": "default", "__modules__":[],
-                        "__types__":[], "__values__":[], "__nested__":[]}
+                        "__types__":[], "__values__":[], "__lists__":[]}
             for k, v in vars(obj).items():
                 if k == "id":
                     template["id"] = v
@@ -99,7 +103,7 @@ class BluePrintEncoder(json.JSONEncoder):
                 elif type(v) in [str, int, bool, float]:
                     template["__values__"].append((k,v))
                 elif type(v) is list:
-                    template["__nested__"].append((k,[fullname(x) for x in v]))
+                    template["__lists__"].append((k, [f"{m.__module__}.{m.__name__}" for m in v]))
             return template
         return json.JSONEncoder.default(self, obj)
 
@@ -114,25 +118,37 @@ class BluePrintDecoder(json.JSONDecoder):
             for k, v in dct["__modules__"] + dct["__types__"]:
                 # ToDo: Add Import Statement + Error Handling
                 kwargs[k] = eval(v)
-            for k, v in dct["__nested__"]:
-                print(v)
-                kwargs[k] = [eval(x) for x in v]
             for k, v in dct["__values__"]:
                 kwargs[k] = v
+            for k, v in dct["__lists__"]:
+                kwargs[k] = [class_from_string(m) for m in v]
             return kwargs
         return dct
 
-def fullname(o):
-    module = o.__class__.__module__
-    if module is None or module == str.__class__.__module__:
-        return o.__class__.__name__
-    return module + '.' + o.__class__.__name__
+def class_from_string(s):
+    """
+    Flexibly evaluates a string qualifier to allow for non-standard package hierarchies.
+    Input: 
+        Full object qualifier (str). Composed of module followed by class name 'MODULE_NAME.CLASS_NAME'
+    Output:
+        Class
+    """
+    try:
+        cls = eval(s) # E.g. torch.nn.modules.loss.BSEloss
+        return cls
+    except:
+        pass
+    parts = s.split(".")
+     # E.g. torch.optim.asgd.ASGD -> torch.optim.ASGD
+    return eval(".".join(parts[:-2] + [parts[-1]])) # Note: Will throw error if len(parts) < 2
+
 
 if __name__ == "__main__":
+    print(fullname(torch.optim.ASGD), type(fullname(torch.optim.ASGD)))
     bp = BluePrint("test",
         optimizer=torch.optim, 
-        #loss=torch.nn.modules.loss,
-        #activation=torch.nn.modules.activation,
+        loss=torch.nn.modules.loss,
+        activation=torch.nn.modules.activation,
         no_epochs=int,
         batch_size=int,
         shuffle=bool,
@@ -142,5 +158,6 @@ if __name__ == "__main__":
     bp.save(Path.cwd() / "Blueprints")
     bp2 = BluePrint("test")
     bp2.load(Path.cwd() / "Blueprints")
-    print(bp2)
     print(bp)
+    print(bp2)
+    print(bp == bp2)
