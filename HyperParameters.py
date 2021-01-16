@@ -4,22 +4,6 @@ from pathlib import Path
 from Color import Color as C
 from BluePrint import BluePrint, BluePrintEncoder, BluePrintDecoder
 from Utils import class_from_string
-# Desired Features:
-# > Support Default Values TICK
-# > JSON Format TICK
-    # > Save/Load as JSON (can edit directly from file) TICK
-    # > Allow for conversion to nested Kwargs TICK
-# > Support Synonyms
-# > Shared Characteristics (only define same hyper-parameter once) TICK
-# > Define hyper-parameters dynamically TICK
-    # > Add new hyper-parameter to hyper-parameters instance, optionally parent blueprint TICK
-# > Parameterise the setup process (smaller function signatures)
-# > Add thorough documentation
-# > Use same Saving Convention for both Blueprint and Hyperparameters TICK
-# > Add Logging (with comet ML)
-# > Add Argparse Control
-# > Add UnitTesting
-# > Add GitHub build status (continuous integration?)
 
 
 class HyperParameters(object):
@@ -32,7 +16,7 @@ class HyperParameters(object):
             HyperParameters.dirPath.mkdir(parents=True, exist_ok=True) # Create directory if it doesn't exist
         if load_existing:
             self.load(HyperParameters.dirPath if custom_dir is None else custom_dir)
-        self.blueprint = blueprint
+        self.blueprint = blueprint # if isinstance(blueprint, BluePrint) else BluePrint(id=blueprint).load(dirPath=dirPath.parent / "Blueprints")
 
         for k,v in kwargs.items():
             if k not in self.blueprint:
