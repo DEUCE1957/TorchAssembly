@@ -1,47 +1,48 @@
-# Desired Features:
-# > JSON Format
-    # > Save/Load as JSON (can edit directly from file)
-    # > Allow for conversion to nested Kwargs
-# > Shared Characteristics (only define same hyper-parameter once)
-# > Define hyper-parameters dynamically
-    # > Add new hyper-parameter to hyper-parameters instance, optionally parent blueprint
-# > Parameterise the setup process (smaller function signatures)
-# > Add thorough documentation
-# > Use same Saving Convention for both Blueprint and Hyperparameters
-# > Add Logging
-# > Add Argparse Control
-# > Add UnitTesting
-# > Add GitHub build status (continuous integration?)
-import sys, pickle, re, copy, inspect, json
+import sys, pickle, re, copy, inspect, json, random
 from types import * 
 import torch
 import logging
 from pathlib import Path
 from Color import Color as C
-
-class BluePrint_Settings(object):
-
-    def __init__(id, filePath=None, ):
-        pass
+from Utils import class_from_string
 
 class BluePrint(object):
+    dirPath = None
 
-    def __init__(self, id, filePath=None, **kwargs):
+    def __init__(self, id, load_existing=False, custom_dir=None, **kwargs):
         self.id = id
+        if BluePrint.dirPath is None:
+            BluePrint.dirPath = Path.cwd() / "BluePrints" if custom_dir is None else custom_dir
+            BluePrint.dirPath.mkdir(parents=True, exist_ok=True) # Create directory if it doesn't exist
+        if load_existing:
+            self.load(BluePrint.dirPath if custom_dir is None else custom_dir)
         for k, v in kwargs.items():
-            if isinstance(v, ModuleType):
-                vars(self).update({k:self.get_module_classes(v)})
-            else:
-                vars(self).update({k:v})
+            self._update_variables(k,v) 
+    
+    def _update_variables(self, k, v):
+        if isinstance(v, ModuleType):
+            vars(self).update({k:self.get_module_classes(v)})
+        elif type(v) is type:
+            vars(self).update({k:v})
+        elif type(v) is list:
+            for elt in v:
+                if not inspect.isclass(elt):
+                    raise ValueError(f"Element in list {k} is not a class")
+            vars(self).update({k:v})
+        else:
+            raise TypeError(f"Value {v} for key {k} has type {type(v)}, should be Module, List or Type.")
 
     def save(self, dirPath):
         with open(dirPath / f"BluePrint_{self.id}.json", "w") as f:
              json.dump(self, f, cls=BluePrintEncoder)
+        return self
 
     def load(self, dirPath):
         with open(dirPath / f"BluePrint_{self.id}.json", "r") as f:#
             kwargs = json.load(f, cls=BluePrintDecoder)
         vars(self).update(kwargs)
+        return self
+
 
     def get_module_classes(self, module):
         cls_dict = {}
@@ -72,7 +73,30 @@ class BluePrint(object):
             resp = input("Provide digit or list of digits to ignore, 'x' to exit")
         return [class_from_string(f"{module.__name__}.{cls.__name__}") for cls in cls_dict.values()]
 
+    def check(self, key, item):
+        if key not in self:
+            raise KeyError(f"{key} not in BluePrint {self.id}")
+        constraint = self[key]
+        if type(constraint) is list:
+            return True if item in constraint else False
+        elif type(constraint) is type:
+            return True if type(item) is constraint else False
+        else:
+            return True if item == constraint else False
+        
+    def __getitem__(self, key):
+        try:
+            item = vars(self).get(key)
+        except:
+            raise KeyError(f"{key} not in BluePrint {self.id}")
+        return item
 
+    def __setitem__(self, key, value):
+        self._update_variables(key,value) 
+
+    def __contains__(self, item):
+        return True if item in vars(self) else False
+            
     def __eq__(self, other):
         x, y = vars(self), vars(other)
         for k in {**x, **y}.keys():
@@ -84,6 +108,7 @@ class BluePrint(object):
     def __str__(self):
         info_str = f">>> {C.BOLD}BluePrint {self.id}{C.END} <<<\n"
         for key, value in vars(self).items():
+            if key in inspect.signature(self.__init__).parameters.keys(): continue  # Ignore __init__ signature params
             info_str += f"\n{C.BOLD}{key}{C.END}={value.__name__ if isinstance(value, (ModuleType, type)) else value}" # ToDo: Pretty Print 
         return info_str
 
@@ -125,26 +150,8 @@ class BluePrintDecoder(json.JSONDecoder):
             return kwargs
         return dct
 
-def class_from_string(s):
-    """
-    Flexibly evaluates a string qualifier to allow for non-standard package hierarchies.
-    Input: 
-        Full object qualifier (str). Composed of module followed by class name 'MODULE_NAME.CLASS_NAME'
-    Output:
-        Class
-    """
-    try:
-        cls = eval(s) # E.g. torch.nn.modules.loss.BSEloss
-        return cls
-    except:
-        pass
-    parts = s.split(".")
-     # E.g. torch.optim.asgd.ASGD -> torch.optim.ASGD
-    return eval(".".join(parts[:-2] + [parts[-1]])) # Note: Will throw error if len(parts) < 2
-
 
 if __name__ == "__main__":
-    print(fullname(torch.optim.ASGD), type(fullname(torch.optim.ASGD)))
     bp = BluePrint("test",
         optimizer=torch.optim, 
         loss=torch.nn.modules.loss,

@@ -1,167 +1,152 @@
-import sys, os, pickle, re, copy, inspect, json
+import sys, os, pickle, re, copy, inspect, json, logging
 from types import * 
+from pathlib import Path
+from Color import Color as C
+from BluePrint import BluePrint, BluePrintEncoder, BluePrintDecoder
+from Utils import class_from_string
+# Desired Features:
+# > Support Default Values TICK
+# > JSON Format TICK
+    # > Save/Load as JSON (can edit directly from file) TICK
+    # > Allow for conversion to nested Kwargs TICK
+# > Support Synonyms
+# > Shared Characteristics (only define same hyper-parameter once) TICK
+# > Define hyper-parameters dynamically TICK
+    # > Add new hyper-parameter to hyper-parameters instance, optionally parent blueprint TICK
+# > Parameterise the setup process (smaller function signatures)
+# > Add thorough documentation
+# > Use same Saving Convention for both Blueprint and Hyperparameters TICK
+# > Add Logging (with comet ML)
+# > Add Argparse Control
+# > Add UnitTesting
+# > Add GitHub build status (continuous integration?)
 
 
 class HyperParameters(object):
-    blueprint = None
+    dirPath = None
 
-    def __init__(self, id, file_path=None, blueprint=None, verbose = False, **kwargs):
+    def __init__(self, id, blueprint, load_existing=False, custom_dir=None, **kwargs):
         self.id = id
-        if file_path is not None:
-            if verbose: print("Loading HyperParameters from {}".format(file_path.split(os.path.sep)[-1]))
-            with open(file_path, 'rb') as handle:
-                d = pickle.load(handle)
-                for key, value in d.items():
-                    value, kwargs = value
-                    if verbose: print(key, str(value), type(value))
-                    if type(value) is str:
-                        exec("self.{} = ('{}',{})".format(key,value,kwargs))
-                    else:
-                        exec("self.{}=({},{})".format(key,value,kwargs))
-            self.configured = (True, None)
-            return
+        if HyperParameters.dirPath is None:
+            HyperParameters.dirPath = Path.cwd() / "HyperParameters" if custom_dir is None else custom_dir
+            HyperParameters.dirPath.mkdir(parents=True, exist_ok=True) # Create directory if it doesn't exist
+        if load_existing:
+            self.load(HyperParameters.dirPath if custom_dir is None else custom_dir)
+        self.blueprint = blueprint
 
-        if HyperParameters.blueprint is None:
-            if isinstance(blueprint, BluePrint):
-                print("Setting BluePrint for all Hyper-Parameter Instances")
-                HyperParameters.blueprint = blueprint
-            else:
-                raise TypeError(
-                    "BluePrint must be provided on 1st instance of Hyper-Parameter Class")
-
-        if len(kwargs) > 1:
-            for key, value in kwargs.items():
-                if HyperParameters.blueprint.get(key) is not None:
-                    try:
-                        value, kwargs = value
-                        if type(value) is str:
-                            exec("self.{}=('{}',{})".format(key,value,kwargs))
-                        else:
-                            exec("self.{}=({},{})".format(key,value,kwargs))
-                    except:
-                        exec("self.{}=({},None)".format(key,value))
-                else:
-                    raise NameError("{} not found in available hyperparameters.".format(key))
-            self.configured = (True, None)
-        else:
-            self.configured = (False, None)
-
-    def wizard(self):
-        if self.configured[0]:
-            print("Already Configured {}".format(id(self)))
-            return False  # Unsuccessful
-
-        for param, abstract_val in HyperParameters.blueprint.__dict__.items():
-
-            is_typed = False
-            if param == "id":
+        for k,v in kwargs.items():
+            if k not in self.blueprint:
+                print(f"{k} not in BluePrint {blueprint.id}")
                 continue
-            print(">>> Choose {} <<<".format(param))
-            if type(abstract_val) is list:
-                print('\n'.join("{}: {}".format(i,abstract_val[i]) for i in range(len(abstract_val))))
+            if self.blueprint.check(k, v):
+                vars(self).update({k:v})
             else:
-                is_typed = True
-                print(abstract_val)
-                print("Enter value of Type {}".format(abstract_val.__name__))
-            resp = input()
-            while True:
-                if is_typed == True:
-                    try:
-                        specific_val = abstract_val(resp)
-                    except:
-                        resp = input("Please enter value of type {}".format(abstract_val.__name__))
-                        continue
-                    exec("self.{} = ({},None)".format(param, specific_val)) in locals()
-                    break
-                else:  # Not Typed
-                    if resp.isdigit():
-                        try:
-                            specific_val = abstract_val[int(resp)]
-                        except:
-                            resp = input("Please pick an integer index in range {}".format(len(abstract_val)))
-                            continue
+                print(f"{k} did not pass BluePrint {blueprint.id} constraints")
 
-                        #*package, method = specific_val.split('.')
-                        exec("import {}".format('.'.join(specific_val.split('.')[:-1]))) in locals()
-                        print(specific_val)
-                        
-                        method = eval(specific_val)
-                        # >>> Display Optional Parameters <<<
-                        counter = 0
-                        valid_counts = []; kwargs = {}
-                        sig = inspect.signature(method)
-                        defaults = [param.default for param in sig.parameters.values() if param.default is not inspect.Parameter.empty]
-                        args = [param_name for param_name in sig.parameters.keys()]
-                        # args,_, _,defaults = inspect.argspec(method.__init__ if inspect.isclass(method) else method)
-                        if defaults is not None:
-                            offset = len(args)-len(defaults)
-                            for i in range(offset,len(args)):
-                                key, default_value = args[i], defaults[i-offset]
+    def save(self, custom_dir=None):
+        file_path = Path(HyperParameters.dirPath if custom_dir is None else custom_dir) / f"HyperParameters_{self.id}.json"
+        with open(file_path, "w") as f:
+             json.dump(self, f, cls=HyperParametersEncoder)
 
-                                if default_value not in [None]:
-                                    print("{}: {} [Default:{}]".format(counter,key,default_value))
-                                    valid_counts.append(counter)
-                                counter += 1
-
-                            if len(valid_counts) > 0:
-                                resp = input("Select parameter by number (e.g. 0), or ENTER to continue")
-                                while resp:
-                                    if resp.isdigit():
-                                        if int(resp) in valid_counts:
-                                            key, default_value = args[int(resp)+offset], defaults[int(resp)]
-                                            new_value = input("Enter new value of type {} [Default: {}]".format(type(default_value).__name__,
-                                                                                                                default_value))
-                                            while new_value:
-                                                try:
-                                                    new_default_val = type(default_value)(new_value)
-                                                    break
-                                                except:
-                                                    new_value = input("Enter new value of type {} [Default: {}]".format(type(default_value).__name__,
-                                                                                                        default_value))
-                                            kwargs[key] = new_default_val
-                                    resp = input("Select parameter by number (e.g. 0), or ENTER to continue")
-                        exec("self.{} = ('{}',{})".format(param, specific_val, kwargs)) in locals()
-                        break
-                    resp = input("Please pick an integer index in range {}".format(len(abstract_val)))
-        self.configured = (True, None)
-        return True
-
-    def save(self, dirPath):
-        file_path = os.path.join(dirPath, f'HyperParameters_{self.id}.pickle')
-        if os.path.exists(file_path):
-            raise ValueError("{} already exists".format(file_path))
-        with open(file_path, 'wb') as handle:
-            pickle.dump(self.__dict__, handle,
-                        protocol=pickle.HIGHEST_PROTOCOL)
-        print("Saved HyperParameters to:\n{}".format(file_path))
-        return file_path
-
-    def get(self, attribute, default=None, kwargs=False):
-        try:
-            specific_val, kwargs = eval("self.{}".format(attribute))
-        except:
-            return default
-
-        try:
-            constraint = eval("HyperParameters.blueprint.{}".format(attribute))
-        except:
-            constraint = None
-        if type(constraint) is type:
-            return constraint(specific_val)
-        else:
-            exec("import {}".format('.'.join(specific_val.split('.')[:-1])))
-            return eval(specific_val), kwargs
-
-    def as_dict(self):
-        return vars(self)
+    def load(self, custom_dir=None):
+        file_path = Path(HyperParameters.dirPath if custom_dir is None else custom_dir) / f"HyperParameters_{self.id}.json"
+        if not file_path.exists() and file_path.is_file(): 
+            raise FileNotFoundError(f"{file_path} does not exist so it could not be loaded into Hyperparameters {self.id}.")
+        with open(file_path, "r") as f:
+            kwargs = json.load(f, cls=HyperParametersDecoder)
+        vars(self).update(kwargs)
+        return self
     
-    def __str__(self):
-        info_str = ">>> {} Hyper-Parameters {} <<<".format(color.BOLD,color.END)
-        for key,value in vars(self).items():
-            if type(value) == tuple:
-                info_str += "\n{0}{2}{1} = {3}".format(color.BOLD,color.END,key,value[0])
-                if len(value) == 2:
-                    if value[1] is not None: info_str += "\n\t**kwargs = {}".format(value[1])
+    def fetch_class_hyperparameters(self, cls):
+        if not inspect.isclass(cls): raise TypeError(f"Attempted to fetch hyper-parameters for non-class")
+        kwargs = {}
+        sig = inspect.signature(cls)
+        for param in sig.parameters.values():
+            if param.default not in [inspect.Parameter.empty, inspect._empty]:
+                # Use existing hyper-parameter as default argument, otherwise use existing default argument
+                kwargs.update({param.name: vars(self).get(param.name, param.default)})
+        return kwargs
+            
+    def get(self, key, default=None):
+        item = vars(self).get(key, default) 
+         # If hyper-parameter shows up as option for class, use it instead of default
+        return (item, self.fetch_class_hyperparameters(item)) if inspect.isclass(item) else item
+
+    def __getitem__(self, key):
+        try:
+            item = vars(self).get(key)
+        except:
+            raise KeyError(f"{key} not in Hyperparameters {self.id}")
+         # If hyper-parameter shows up as option for class, use it instead of default
+        return (item, self.fetch_class_hyperparameters(item)) if inspect.isclass(item) else item
+
+    def __setitem__(self, key, value, update_blueprint=False):
+        if update_blueprint:
+            try:
+                self.blueprint[key] = value
+            except (ValueError, TypeError):
+                print(f"Warning: Failed to update Blueprint {self.blueprint.id} with key {key} and value {value}")
+        if key in self.blueprint:
+            if self.blueprint.check(key, value):
+                vars(self).update({key:value})
             else:
-                info_str += "\n{} = {}".format(key,value)
+                raise ValueError(f"Value {value} for key {key} does not meet constraint: {self.blueprint[key]}")
+        else: # Hyperparameter only exists in this instance
+            vars(self).update({key:value})
+
+    def __str__(self):
+        info_str = f">>> {C.BOLD} Hyper-Parameters '{self.id}' {C.END} <<<"
+        for key,value in vars(self).items():
+            if key in inspect.signature(self.__init__).parameters.keys(): continue # Ignore __init__ signature params
+            if type(value) == tuple:
+                info_str += "\n{C.BOLD}{key}{C.END} = {value}"
+                if len(value) == 2:
+                    if value[1] is not None: info_str += f"\n\t**kwargs = {value[1]}"
+            else:
+                info_str += f"\n{key} = {value}"
         return info_str
+
+class HyperParametersEncoder(json.JSONEncoder):
+
+    def default(self, obj):
+        if isinstance(obj, HyperParameters):
+            template = {"id": "default", "__classes__":[],
+                        "__primitives__":[]}
+            for k, v in vars(obj).items():
+                if k == "id":
+                    template["id"] = v
+                elif callable(v):
+                    template["__classes__"].append((k,f"{v.__module__}.{v.__name__}"))
+                elif type(v) in [str, int, bool, float]:
+                    template["__primitives__"].append((k,v))
+            return template
+        return json.JSONEncoder.default(self, obj)
+
+class HyperParametersDecoder(json.JSONDecoder):
+
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+    
+    def object_hook(self, dct):
+        if "__classes__" in dct and "__primitives__" in dct: # Is Hyperparameters instance
+            kwargs = {}
+            for k, v in dct["__classes__"]:
+                kwargs[k] = class_from_string(v)
+            for k, v in dct["__primitives__"]:
+                kwargs[k] = v
+            return kwargs
+        return dct
+
+
+if __name__ == "__main__":
+    from BluePrint import BluePrint
+    import torch
+    bp = BluePrint("test")
+    bp.load(Path.cwd() / "Blueprints")
+
+    hparams = HyperParameters("test", blueprint=bp, no_epochs=20, shuffle=True, optimizer=torch.optim.ASGD)
+    hparams.save()
+    hparams2 = HyperParameters("test", blueprint="test")
+    hparams2.load()
+    print(hparams2.get("optimizer", torch.optim.Adam))
+    print(hparams2.get("no_epochs", 10))

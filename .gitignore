@@ -1,0 +1,10 @@
+Blueprints/
+Blueprints/*
+Hyperparameters/
+Hyperparameters/*
+__pycache__/
+__pycache__/*
+.vscode/
+.vscode/*
+*.json
+*.pyc
