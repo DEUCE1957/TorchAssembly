@@ -1,9 +1,9 @@
-import sys, os, pickle, re, copy, inspect, json, logging
+import torch, inspect, json, logging, argparse
 from types import * 
 from pathlib import Path
 from Color import Color as C
 from BluePrint import BluePrint, BluePrintEncoder, BluePrintDecoder
-from Utils import class_from_string
+from Utils import class_from_string, str2bool, valid_dir_path, parse_key_value_pairs
 
 
 class HyperParameters(object):
@@ -123,14 +123,32 @@ class HyperParametersDecoder(json.JSONDecoder):
 
 
 if __name__ == "__main__":
-    from BluePrint import BluePrint
-    import torch
-    bp = BluePrint("test")
-    bp.load(Path.cwd() / "Blueprints")
+    parser = argparse.ArgumentParser(description='>> Generate a Hyper-Parameter combination using an existing BluePrint <<')
+    parser.add_argument('-i', dest="id", type=str, metavar='STR', nargs='?', default="default", const=True,
+                        help='Identifier for the Hyper-Parameter combination, will overwrite existing if not unique.')
+    parser.add_argument('-b', dest="blueprint_id", type=str, metavar='STR', nargs='?', default="default", const=True,
+                    help='Identifier for the previously-created BluePrint, used to check Hyper-parameter values against constraints.')
+    parser.add_argument('-l', dest='load_existing', type=str2bool, metavar='BOOL', nargs="?", default=False, const=True,
+                        help='Whether to try and load an existing Hyper-Parameter combination with the same id')
+    parser.add_argument('-p', dest="custom_dir", type=valid_dir_path, metavar='STR', nargs='?', default=Path.cwd() / "Blueprints", const=True,
+                            help='Path to directory containing Hyper-Parameter combinations.')
+    parser.add_argument("--set",
+                        metavar="KEY=VALUE",
+                        nargs='+',
+                        help="""Set a number of key-value pairs (NO space before/after = sign).
+                             If a value contains spaces, you should define it with double quotes:
+                             'foo="this is a sentence". Note that values are always treated as strings.""")
+    args = parser.parse_args()
+    kwargs = parse_key_value_pairs(args.set, no_epochs=20, batch_size=10, shuffle=True)
+    bp = BluePrint(args.blueprint_id)
+    bp.load(args.custom_dir)
 
-    hparams = HyperParameters("test", blueprint=bp, no_epochs=20, shuffle=True, optimizer=torch.optim.ASGD)
+    hparams = HyperParameters("test", blueprint=bp, **kwargs)
     hparams.save()
-    hparams2 = HyperParameters("test", blueprint="test")
+    hparams2 = HyperParameters("test", blueprint=bp)
     hparams2.load()
     print(hparams2.get("optimizer", torch.optim.Adam))
     print(hparams2.get("no_epochs", 10))
+    print(hparams)
+    print(hparams2)
+    print(f"Initial HParams == Reloaded HParams: {hparams == hparams2}")

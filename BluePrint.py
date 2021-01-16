@@ -1,10 +1,8 @@
-import sys, pickle, re, copy, inspect, json, random
+import torch, logging, re, inspect, json, argparse
 from types import * 
-import torch
-import logging
 from pathlib import Path
 from Color import Color as C
-from Utils import class_from_string
+from Utils import class_from_string, str2bool, valid_dir_path, parse_key_value_pairs
 
 class BluePrint(object):
     dirPath = None
@@ -106,7 +104,7 @@ class BluePrint(object):
         return True
 
     def __str__(self):
-        info_str = f">>> {C.BOLD}BluePrint {self.id}{C.END} <<<\n"
+        info_str = f">>> {C.BOLD}BluePrint {self.id}{C.END} <<<"
         for key, value in vars(self).items():
             if key in inspect.signature(self.__init__).parameters.keys(): continue  # Ignore __init__ signature params
             info_str += f"\n{C.BOLD}{key}{C.END}={value.__name__ if isinstance(value, (ModuleType, type)) else value}" # ToDo: Pretty Print 
@@ -152,19 +150,28 @@ class BluePrintDecoder(json.JSONDecoder):
 
 
 if __name__ == "__main__":
-    bp = BluePrint("test",
-        optimizer=torch.optim, 
-        loss=torch.nn.modules.loss,
-        activation=torch.nn.modules.activation,
-        no_epochs=int,
-        batch_size=int,
-        shuffle=bool,
-        dropout_probability=float,
-        learning_rate=float,
+    parser = argparse.ArgumentParser(description='>> Generate a Blueprint for future hyper-parameter combinations <<')
+    parser.add_argument('-i', dest="id", type=str, metavar='STR', nargs='?', default="default", const=True,
+                        help='Identifier for the BluePrint, will overwrite existing if not unique.')
+    parser.add_argument('-l', dest='load_existing', type=str2bool, metavar='BOOL', nargs="?", default=False, const=True,
+                        help='Whether to try and load an existing Blueprint with the same id')
+    parser.add_argument('-p', dest="custom_dir", type=valid_dir_path, metavar='STR', nargs='?', default=Path.cwd() / "BluePrints", const=True,
+                            help='Path to directory containing Blueprints.')
+    parser.add_argument("--set",
+                        metavar="KEY=VALUE",
+                        nargs='+',
+                        help="""Set a number of key-value pairs (NO space before/after = sign).
+                             If a value contains spaces, you should define it with double quotes:
+                             'foo="this is a sentence". Note that values are always treated as strings.""")
+    args = parser.parse_args()
+    # Additional params here are fallbacks if no args.set provided
+    kwargs = parse_key_value_pairs(args.set, no_epochs=int, batch_size=int, shuffle=bool) 
+    bp = BluePrint(args.id, args.load_existing, args.custom_dir,
+        **kwargs,
     )
-    bp.save(Path.cwd() / "Blueprints")
-    bp2 = BluePrint("test")
-    bp2.load(Path.cwd() / "Blueprints")
+    bp.save(args.custom_dir)
+    bp2 = BluePrint("default")
+    bp2.load(args.custom_dir)
     print(bp)
     print(bp2)
-    print(bp == bp2)
+    print(f"\n{C.BOLD}Initial Blueprint{C.END} == {C.BOLD}Reloaded Blueprint{C.END}: {bp == bp2}")
