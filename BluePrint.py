@@ -3,10 +3,12 @@ from types import *
 from pathlib import Path
 from Color import Color as C
 from Utils import class_from_string, str2bool, valid_dir_path, parse_key_value_pairs
+from log import log_decor
 
 class BluePrint(object):
     dirPath = None
 
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def __init__(self, id, load_existing=False, custom_dir=None, **kwargs):
         self.id = id
         if BluePrint.dirPath is None:
@@ -17,6 +19,7 @@ class BluePrint(object):
         for k, v in kwargs.items():
             self._update_variables(k,v) 
     
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def _update_variables(self, k, v):
         if isinstance(v, ModuleType):
             vars(self).update({k:self.get_module_classes(v)})
@@ -29,19 +32,21 @@ class BluePrint(object):
             vars(self).update({k:v})
         else:
             raise TypeError(f"Value {v} for key {k} has type {type(v)}, should be Module, List or Type.")
-
+    
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def save(self, dirPath):
         with open(dirPath / f"BluePrint_{self.id}.json", "w") as f:
              json.dump(self, f, cls=BluePrintEncoder)
         return self
 
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def load(self, dirPath):
         with open(dirPath / f"BluePrint_{self.id}.json", "r") as f:#
             kwargs = json.load(f, cls=BluePrintDecoder)
         vars(self).update(kwargs)
         return self
 
-
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def get_module_classes(self, module):
         cls_dict = {}
         for count, (name, cls) in enumerate(inspect.getmembers(module, inspect.isclass)):
@@ -71,6 +76,7 @@ class BluePrint(object):
             resp = input("Provide digit or list of digits to ignore, 'x' to exit")
         return [class_from_string(f"{module.__name__}.{cls.__name__}") for cls in cls_dict.values()]
 
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def check(self, key, item):
         if key not in self:
             raise KeyError(f"{key} not in BluePrint {self.id}")
@@ -81,7 +87,8 @@ class BluePrint(object):
             return True if type(item) is constraint else False
         else:
             return True if item == constraint else False
-        
+
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)  
     def __getitem__(self, key):
         try:
             item = vars(self).get(key)
@@ -89,12 +96,15 @@ class BluePrint(object):
             raise KeyError(f"{key} not in BluePrint {self.id}")
         return item
 
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def __setitem__(self, key, value):
         self._update_variables(key,value) 
-
+        
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def __contains__(self, item):
         return True if item in vars(self) else False
-            
+
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)        
     def __eq__(self, other):
         x, y = vars(self), vars(other)
         for k in {**x, **y}.keys():
@@ -103,6 +113,7 @@ class BluePrint(object):
             if x[k] != y[k]: return False
         return True
 
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def __str__(self):
         info_str = f">>> {C.BOLD}BluePrint {self.id}{C.END} <<<"
         for key, value in vars(self).items():
@@ -112,6 +123,7 @@ class BluePrint(object):
 
 class BluePrintEncoder(json.JSONEncoder):
 
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def default(self, obj):
         if isinstance(obj, BluePrint):
             template = {"id": "default", "__modules__":[],
@@ -132,9 +144,11 @@ class BluePrintEncoder(json.JSONEncoder):
 
 class BluePrintDecoder(json.JSONDecoder):
 
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def __init__(self, *args, **kwargs):
         json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
-    
+
+    @log_decor("Blueprints", level=logging.ERROR, tolerate_errors=False)
     def object_hook(self, dct):
         if "__modules__" in dct: # Is BluePrint
             kwargs = {}
@@ -157,6 +171,8 @@ if __name__ == "__main__":
                         help='Whether to try and load an existing Blueprint with the same id')
     parser.add_argument('-p', dest="custom_dir", type=valid_dir_path, metavar='STR', nargs='?', default=Path.cwd() / "BluePrints", const=True,
                             help='Path to directory containing Blueprints.')
+    parser.add_argument('--log', dest="log_level", type=str, metavar="STR", nargs='?', default=logging.ERROR,
+                            help="Logging level (Choose: ERROR, WARNING, INFO, DEBUG")
     parser.add_argument("--set",
                         metavar="KEY=VALUE",
                         nargs='+',

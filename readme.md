@@ -11,6 +11,6 @@
 * Add thorough documentation
 * Use same Saving Convention for both Blueprint and Hyperparameters TICK
 * Add Logging (with comet ML)
-* Add Argparse Control
+* Add Argparse Control TICK
 * Add UnitTesting
 * Add GitHub build status (continuous integration?)

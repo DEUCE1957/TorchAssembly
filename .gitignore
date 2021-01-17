@@ -4,6 +4,9 @@ Hyperparameters/
 Hyperparameters/*
 __pycache__/
 __pycache__/*
+logs/
+logs/*
+*.log
 .vscode/
 .vscode/*
 *.json

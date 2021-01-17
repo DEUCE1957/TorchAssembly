@@ -9,6 +9,7 @@ from Utils import class_from_string, str2bool, valid_dir_path, parse_key_value_p
 class HyperParameters(object):
     dirPath = None
 
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)
     def __init__(self, id, blueprint, load_existing=False, custom_dir=None, **kwargs):
         self.id = id
         if HyperParameters.dirPath is None:
@@ -27,11 +28,13 @@ class HyperParameters(object):
             else:
                 print(f"{k} did not pass BluePrint {blueprint.id} constraints")
 
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)
     def save(self, custom_dir=None):
         file_path = Path(HyperParameters.dirPath if custom_dir is None else custom_dir) / f"HyperParameters_{self.id}.json"
         with open(file_path, "w") as f:
              json.dump(self, f, cls=HyperParametersEncoder)
 
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)
     def load(self, custom_dir=None):
         file_path = Path(HyperParameters.dirPath if custom_dir is None else custom_dir) / f"HyperParameters_{self.id}.json"
         if not file_path.exists() and file_path.is_file(): 
@@ -40,7 +43,8 @@ class HyperParameters(object):
             kwargs = json.load(f, cls=HyperParametersDecoder)
         vars(self).update(kwargs)
         return self
-    
+
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)
     def fetch_class_hyperparameters(self, cls):
         if not inspect.isclass(cls): raise TypeError(f"Attempted to fetch hyper-parameters for non-class")
         kwargs = {}
@@ -50,12 +54,14 @@ class HyperParameters(object):
                 # Use existing hyper-parameter as default argument, otherwise use existing default argument
                 kwargs.update({param.name: vars(self).get(param.name, param.default)})
         return kwargs
-            
+
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)        
     def get(self, key, default=None):
         item = vars(self).get(key, default) 
          # If hyper-parameter shows up as option for class, use it instead of default
         return (item, self.fetch_class_hyperparameters(item)) if inspect.isclass(item) else item
 
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)
     def __getitem__(self, key):
         try:
             item = vars(self).get(key)
@@ -64,6 +70,7 @@ class HyperParameters(object):
          # If hyper-parameter shows up as option for class, use it instead of default
         return (item, self.fetch_class_hyperparameters(item)) if inspect.isclass(item) else item
 
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)
     def __setitem__(self, key, value, update_blueprint=False):
         if update_blueprint:
             try:
@@ -78,6 +85,7 @@ class HyperParameters(object):
         else: # Hyperparameter only exists in this instance
             vars(self).update({key:value})
 
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)
     def __str__(self):
         info_str = f">>> {C.BOLD} Hyper-Parameters '{self.id}' {C.END} <<<"
         for key,value in vars(self).items():
@@ -92,6 +100,7 @@ class HyperParameters(object):
 
 class HyperParametersEncoder(json.JSONEncoder):
 
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)
     def default(self, obj):
         if isinstance(obj, HyperParameters):
             template = {"id": "default", "__classes__":[],
@@ -108,9 +117,11 @@ class HyperParametersEncoder(json.JSONEncoder):
 
 class HyperParametersDecoder(json.JSONDecoder):
 
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)
     def __init__(self, *args, **kwargs):
         json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
-    
+        
+    @log_decor("Hyperparameters", level=logging.ERROR, tolerate_errors=False)
     def object_hook(self, dct):
         if "__classes__" in dct and "__primitives__" in dct: # Is Hyperparameters instance
             kwargs = {}
