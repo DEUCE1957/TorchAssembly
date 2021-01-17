@@ -10,7 +10,7 @@
 * Parameterise the setup process (smaller function signatures)
 * Add thorough documentation
 * Use same Saving Convention for both Blueprint and Hyperparameters TICK
-* Add Logging (with comet ML)
+* Add Logging TICK
 * Add Argparse Control TICK
-* Add UnitTesting
-* Add GitHub build status (continuous integration?)
+* Add UnitTesting TICK
+* Add GitHub build status
