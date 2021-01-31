@@ -1,6 +1,11 @@
-import torch, inspect, json, logging, argparse
+import torch, sys, inspect, json, logging, argparse
 from types import * 
 from pathlib import Path
+
+base_path = Path(__file__).parent
+if base_path.__str__() not in sys.path:
+    sys.path.append(base_path.__str__())
+
 from Color import Color as C
 from BluePrint import BluePrint, BluePrintEncoder, BluePrintDecoder
 from Utils import class_from_string, str2bool, valid_dir_path, parse_key_value_pairs
