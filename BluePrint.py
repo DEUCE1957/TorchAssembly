@@ -64,7 +64,7 @@ class BluePrint(object):
             if not self.skip_prompts:
                 print(f"{count}: {C.BOLD}{name}{C.END} ({desc})")
             cls_dict[count] = cls
-        resp = "x" if self.skip_prompts else input("Provide digit (e.g. 3), or list of digits (e.g. 2,4,6 ), of elements to IGNORE. 'x' to exit")
+        resp = "x" if self.skip_prompts else input("Provide digit (e.g. 3), or list of digits (e.g. 2,4,6), of elements to IGNORE. 'x' to exit")
         while resp != "x":
             numbers = resp.split(",")
             for number in numbers:

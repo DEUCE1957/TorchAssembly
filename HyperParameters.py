@@ -62,6 +62,28 @@ class HyperParameters(object):
                 # Use existing hyper-parameter as default argument, otherwise use existing default argument
                 kwargs.update({param.name: vars(self).get(param.name, param.default)})
         return kwargs
+
+    def wizard(self):
+        for key, constraint in vars(self.blueprint).items():
+            if key in ["id", "skip_prompts", "logger"]: continue
+            is_typed = True if type(constraint) is type else False
+            if is_typed: print(f"Enter value of Type {constraint.__name__}")
+            else: print("\n".join([f"{i}: {c}" for i, c in enumerate(constraint)]))
+
+            while (resp := input(f"Choose a value for {key}, or ENTER to skip").strip()) != "":
+                if is_typed:
+                    try:
+                        value = constraint(resp)
+                        break
+                    except:
+                        print(f"Response {resp} did not satisfy {key}'s {constaint} constraint")
+                else:
+                    if resp.isdigit():
+                        value = constraint[int(resp)]
+                        break
+                    else:
+                        print(f"Please select a one of the options for {key} by number.")
+            vars(self).update({key:value})
    
     def get(self, key, default=None):
         item = vars(self).get(key, default) 
@@ -166,7 +188,8 @@ if __name__ == "__main__":
     bp = BluePrint(args.blueprint_id)
     bp.load(args.custom_dir)
 
-    hparams = HyperParameters("test", blueprint=bp, **kwargs)
+    hparams = HyperParameters("test", blueprint=bp)
+    hparams.wizard()
     hparams.save()
     hparams2 = HyperParameters("test", blueprint=bp)
     hparams2.load()
