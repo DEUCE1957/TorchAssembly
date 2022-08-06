@@ -44,8 +44,11 @@ class BluePrint(object):
             raise TypeError(msg)
     
     def save(self, dirPath):
+        print("Saving")
         with open(dirPath / f"BluePrint_{self.id}.json", "w") as f:
+             print(dirPath / f"BluePrint_{self.id}.json")
              json.dump(self, f, cls=BluePrintEncoder)
+             print("DUMPING")
         return self
 
     def load(self, dirPath):
@@ -185,8 +188,8 @@ if __name__ == "__main__":
     bp = BluePrint(args.id, args.load_existing, args.custom_dir, log_level=getattr(logging, args.log_level),
         **kwargs,
     )
-    bp.save(args.custom_dir)
-    bp2 = BluePrint("default")
+    BluePrint.save(bp, args.custom_dir)
+    bp2 = BluePrint(args.id)
     bp2.load(args.custom_dir)
     print(bp)
     print(bp2)
