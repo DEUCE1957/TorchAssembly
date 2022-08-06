@@ -44,11 +44,9 @@ class BluePrint(object):
             raise TypeError(msg)
     
     def save(self, dirPath):
-        print("Saving")
         with open(dirPath / f"BluePrint_{self.id}.json", "w") as f:
              print(dirPath / f"BluePrint_{self.id}.json")
              json.dump(self, f, cls=BluePrintEncoder)
-             print("DUMPING")
         return self
 
     def load(self, dirPath):

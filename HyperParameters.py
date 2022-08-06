@@ -83,7 +83,8 @@ class HyperParameters(object):
                         break
                     else:
                         print(f"Please select a one of the options for {key} by number.")
-            vars(self).update({key:value})
+            if resp != "":
+                vars(self).update({key:value})
    
     def get(self, key, default=None):
         item = vars(self).get(key, default) 
@@ -175,7 +176,7 @@ if __name__ == "__main__":
                     help='Identifier for the previously-created BluePrint, used to check Hyper-parameter values against constraints.')
     parser.add_argument('-l', dest='load_existing', type=str2bool, metavar='BOOL', nargs="?", default=False, const=True,
                         help='Whether to try and load an existing Hyper-Parameter combination with the same id')
-    parser.add_argument('-p', dest="custom_dir", type=valid_dir_path, metavar='STR', nargs='?', default=Path.cwd() / "Blueprints", const=True,
+    parser.add_argument('-p', dest="custom_dir", type=valid_dir_path, metavar='STR', nargs='?', default=Path.cwd() / "BluePrints", const=True,
                             help='Path to directory containing Hyper-Parameter combinations.')
     parser.add_argument("--set",
                         metavar="KEY=VALUE",
@@ -190,7 +191,7 @@ if __name__ == "__main__":
 
     hparams = HyperParameters("test", blueprint=bp)
     hparams.wizard()
-    hparams.save()
+    HyperParameters.save(hparams)
     hparams2 = HyperParameters("test", blueprint=bp)
     hparams2.load()
     print(hparams2.get("optimizer", torch.optim.Adam))
