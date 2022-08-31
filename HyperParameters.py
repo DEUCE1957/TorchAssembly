@@ -76,7 +76,7 @@ class HyperParameters(object):
                         value = constraint(resp)
                         break
                     except:
-                        print(f"Response {resp} did not satisfy {key}'s {constaint} constraint")
+                        print(f"Response {resp} did not satisfy {key}'s {constraint} constraint")
                 else:
                     if resp.isdigit():
                         value = constraint[int(resp)]
