@@ -182,7 +182,12 @@ if __name__ == "__main__":
                              'foo="this is a sentence". Note that values are always treated as strings.""")
     args = parser.parse_args()
     # Additional params here are fallbacks if no args.set provided
-    kwargs = parse_key_value_pairs(args.set, no_epochs=int, batch_size=int, shuffle=bool, optimizer=torch.optim) 
+    if args.set is None: # Show examples
+        print("No key-value pairs provided, showing examples.")
+        kwargs = parse_key_value_pairs(args.set, no_epochs=int, epsilon=float, shuffle=bool, optimizer=torch.optim)
+    else:
+        kwargs = parse_key_value_pairs(args.set)
+         
     bp = BluePrint(args.id, args.load_existing, args.custom_dir, log_level=getattr(logging, args.log_level),
         **kwargs,
     )

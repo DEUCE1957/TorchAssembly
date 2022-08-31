@@ -185,17 +185,18 @@ if __name__ == "__main__":
                              If a value contains spaces, you should define it with double quotes:
                              'foo="this is a sentence". Note that values are always treated as strings.""")
     args = parser.parse_args()
-    kwargs = parse_key_value_pairs(args.set, no_epochs=20, batch_size=10, shuffle="True")
+    if args.set is None: # Show examples
+        kwargs = parse_key_value_pairs(args.set, no_epochs=20, batch_size=10, shuffle="True")
+    else:
+        kwargs = parse_key_value_pairs(args.set)
     bp = BluePrint(args.blueprint_id)
     bp.load(args.custom_dir)
 
-    hparams = HyperParameters("test", blueprint=bp)
+    hparams = HyperParameters(args.id, blueprint=bp)
     hparams.wizard()
     HyperParameters.save(hparams)
-    hparams2 = HyperParameters("test", blueprint=bp)
+    hparams2 = HyperParameters(args.id, blueprint=bp)
     hparams2.load()
-    print(hparams2.get("optimizer", torch.optim.Adam))
-    print(hparams2.get("no_epochs", 10))
     print(hparams)
     print(hparams2)
     print(f"Initial HParams == Reloaded HParams: {hparams == hparams2}")
